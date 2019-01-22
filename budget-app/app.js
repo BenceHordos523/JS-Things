@@ -1,8 +1,22 @@
 let budgetController = (function(){
-  let Expanse = function(id, description, value){
+
+  let Expense = function(id, description, value){
     this.id = id
     this.description = description
     this.value = value
+    this.percentage = -1
+  }
+
+  Expense.prototype.calcPrecentage = function(totalInc){
+    if(totalInc > 0){
+      this.percentage = Math.round((this.value / totalInc) * 100)
+    } else {
+      this.percentage = -1
+    }
+  }
+
+  Expense.prototype.getPercentage = function(){
+    return this.percentage
   }
 
   let Income = function(id, description, value){
@@ -42,7 +56,7 @@ let budgetController = (function(){
           newItem = new Income(lastID + 1, description, value)
           break;
         case "exp":
-          newItem = new Expanse(lastID + 1, description, value)
+          newItem = new Expense(lastID + 1, description, value)
           break;
       }
       data.allItems[type].push(newItem)
@@ -59,6 +73,19 @@ let budgetController = (function(){
       } else {
         data.percentage = -1
       }
+    },
+
+    calculatePercenteges: function(){
+      data.allItems.exp.forEach(item => item.calcPrecentage(data.totals.inc))
+    },
+
+    getPercentages: function(){
+      return data.allItems.exp.map(item => item.getPercentage())
+    },
+
+    deleteItem: function(type, id){
+      console.log(type, id)
+      data.allItems[type] = data.allItems[type].filter(item => item.id !== id)
     },
 
     testing: function(){
@@ -88,7 +115,20 @@ let UIController = (function(){
     budgetLabel: '.budget__value',
     incomeLabel: '.budget__income--value',
     expenseLabel: '.budget__expenses--value',
-    percentageLabel: '.budget__expenses--percentage'
+    percentageLabel: '.budget__expenses--percentage',
+    container: '.container',
+    expensePercentageLabel: '.item__percentage'
+  }
+
+  let formatNumber = function(num, type){
+    num = Math.abs(num).toFixed(2)
+    let [int, dec] = num.split(".")
+    if(int.length > 3){
+      int = int.substr(0, int.length - 3) + ',' + int.substr(int.length - 3, int.length)
+    }
+
+    return (type === "exp" ? "-" : "+") + int + "." + dec
+
   }
 
   return {
@@ -106,10 +146,10 @@ let UIController = (function(){
       if(type === 'inc'){
         element = DOMstrings.incomeContainer
         html = `
-          <div class="item clearfix" id="income-${id}">
+          <div class="item clearfix" id="inc-${id}">
               <div class="item__description">${description}</div>
               <div class="right clearfix">
-                  <div class="item__value">+ ${value}</div>
+                  <div class="item__value">${formatNumber(value, type)}</div>
                   <div class="item__delete">
                       <button class="item__delete--btn"><i class="ion-ios-close-outline"></i></button>
                   </div>
@@ -119,11 +159,11 @@ let UIController = (function(){
       } else {
         element = DOMstrings.expenseContainer
         html = `
-          <div class="item clearfix" id="expense-${id}">
+          <div class="item clearfix" id="exp-${id}">
               <div class="item__description">${description}t</div>
               <div class="right clearfix">
-                  <div class="item__value">- ${value}</div>
-                  <div class="item__percentage">dummy%</div>
+                  <div class="item__value">${formatNumber(value, type)}</div>
+                  <div class="item__percentage"></div>
                   <div class="item__delete">
                       <button class="item__delete--btn"><i class="ion-ios-close-outline"></i></button>
                   </div>
@@ -134,6 +174,18 @@ let UIController = (function(){
       document.querySelector(element).insertAdjacentHTML('beforeend', html)
     },
 
+    deleteListItem: function(selectorID){
+      const element = document.getElementById(selectorID)
+
+      element.parentNode.removeChild(element)
+    },
+
+    displayPercentages: function(percentages){
+      let fields = document.querySelectorAll(DOMstrings.expensePercentageLabel)
+
+      fields.forEach((field, index) => field.textContent = `${percentages[index]}%`)
+    },
+
     clearFields: function(){
       let fields = document.querySelectorAll(DOMstrings.inputDescription + ', ' + DOMstrings.inputValue)
       fields.forEach(field => field.value = "")
@@ -141,9 +193,10 @@ let UIController = (function(){
     },
 
     displayBudget: function({ budget, totalInc, totalExp, percentage }){
-      document.querySelector(DOMstrings.budgetLabel).textContent = budget
-      document.querySelector(DOMstrings.incomeLabel).textContent = totalInc
-      document.querySelector(DOMstrings.expenseLabel).textContent = totalExp
+      let budgetType =  budget >= 0 ? 'inc' : 'exp'
+      document.querySelector(DOMstrings.budgetLabel).textContent = formatNumber(budget, budgetType)
+      document.querySelector(DOMstrings.incomeLabel).textContent = formatNumber(totalInc, "+")
+      document.querySelector(DOMstrings.expenseLabel).textContent = formatNumber(totalExp, "-")
 
       if(percentage > 0){
         document.querySelector(DOMstrings.percentageLabel).textContent = percentage
@@ -171,6 +224,8 @@ let controller = (function(budgetCtrl, UICtrl){
         ctrlAdditem()
       }
     })
+
+    document.querySelector(DOM.container).addEventListener('click', ctrlDeleteItem)
   }
 
   let ctrlAdditem = function(){
@@ -186,10 +241,25 @@ let controller = (function(budgetCtrl, UICtrl){
       UICtrl.clearFields()
 
       updateBudget()
+
+      updtePercentages()
     }
+  }
 
+  let ctrlDeleteItem = function(e){
+    let itemID = e.target.parentNode.parentNode.parentNode.parentNode.id;
 
+    if(itemID){
+      let [type, id] = itemID.split("-")
 
+      budgetCtrl.deleteItem(type, parseInt(id))
+
+      UICtrl.deleteListItem(itemID)
+
+      updateBudget()
+
+      updtePercentages()
+    }
   }
 
   let updateBudget = function(){
@@ -199,6 +269,14 @@ let controller = (function(budgetCtrl, UICtrl){
 
     UICtrl.displayBudget(budget)
 
+  }
+
+  let updtePercentages = function(){
+    budgetCtrl.calculatePercenteges()
+
+    let percentages = budgetCtrl.getPercentages()
+
+    UICtrl.displayPercentages(percentages)
   }
 
   return {
