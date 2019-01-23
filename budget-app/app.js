@@ -117,7 +117,8 @@ let UIController = (function(){
     expenseLabel: '.budget__expenses--value',
     percentageLabel: '.budget__expenses--percentage',
     container: '.container',
-    expensePercentageLabel: '.item__percentage'
+    expensePercentageLabel: '.item__percentage',
+    dateLabel: '.budget__title--month'
   }
 
   let formatNumber = function(num, type){
@@ -206,6 +207,29 @@ let UIController = (function(){
 
     },
 
+    changeType: function(){
+      let fields = document.querySelectorAll(
+        DOMstrings.inputType + ',' +
+        DOMstrings.inputDescription + ',' +
+        DOMstrings.inputValue
+      )
+
+      fields.forEach(field => {
+        field.classList.toggle('red-focus')
+      })
+
+      document.querySelector(DOMstrings.inputBtn).classList.toggle('red')
+    },
+
+    displayMonth: function(){
+      const now = new Date()
+      const year = now.getFullYear()
+      const months = ['January','February','March','April','May','June','July','August','September','October','November','December']
+      const month = now.getMonth()
+
+      document.querySelector(DOMstrings.dateLabel).textContent = months[month] + ' ' + year
+    },
+
     getDOMStrings: function(){
       return DOMstrings
     }
@@ -226,6 +250,8 @@ let controller = (function(budgetCtrl, UICtrl){
     })
 
     document.querySelector(DOM.container).addEventListener('click', ctrlDeleteItem)
+
+    document.querySelector(DOM.inputType).addEventListener('change', UICtrl.changeType)
   }
 
   let ctrlAdditem = function(){
@@ -282,6 +308,7 @@ let controller = (function(budgetCtrl, UICtrl){
   return {
     init: () => {
       setUpEventListeners()
+      UICtrl.displayMonth()
       UICtrl.displayBudget({
         budget: 0,
         totalInc: 0,
